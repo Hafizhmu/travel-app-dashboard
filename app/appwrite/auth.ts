@@ -5,7 +5,11 @@ import axios from "axios";
 
 export const loginWithGoogle = async () => {
   try {
-    account.createOAuth2Session(OAuthProvider.Google);
+    account.createOAuth2Session(
+      OAuthProvider.Google,
+      `${window.location.origin}/`,
+      `${window.location.origin}/404`
+    );
   } catch (error) {
     console.error("Error logging in with Google:", error);
   }
@@ -24,6 +28,7 @@ export const getUser = async () => {
         Query.select(["name", "email", "imageUrl", "joinedAt", "accountId"]),
       ]
     );
+    return documents.length > 0 ? documents[0] : redirect("/sign-in");
   } catch (error) {
     console.error("Error logging in with Google:", error);
   }
@@ -36,7 +41,7 @@ export const logoutUser = async () => {
     console.error("Error logging in with Google:", error);
   }
 };
-export const getGooglePicture = async () => {
+export const getGooglePicture = async (accessToken: string) => {
   try {
     const session = await account.getSession("current");
     const oAuthToken = session.providerAccessToken;
@@ -67,40 +72,40 @@ export const getGooglePicture = async () => {
     return null;
   }
 };
-export const storeUserData = async () => {
-  try {
-    const user = await account.get();
+// export const storeUserData = async () => {
+//   try {
+//     const user = await account.get();
 
-    if (!user) return null;
+//     if (!user) return null;
 
-    const { documents } = await database.listDocuments(
-      appwriteConfig.databaseId,
-      appwriteConfig.userCollectionId,
-      [Query.equal("accountId", user.$id)]
-    );
-    if (documents.length > 0) return documents[0];
+//     const { documents } = await database.listDocuments(
+//       appwriteConfig.databaseId,
+//       appwriteConfig.userCollectionId,
+//       [Query.equal("accountId", user.$id)]
+//     );
+//     if (documents.length > 0) return documents[0];
 
-    const imageUrl = await getGooglePicture();
+//     const imageUrl = await getGooglePicture();
 
-    const newUser = await database.createDocument(
-      appwriteConfig.databaseId,
-      appwriteConfig.userCollectionId,
-      ID.unique(),
-      {
-        accountId: user.$id,
-        email: user.email,
-        name: user.name,
-        imageUrl: imageUrl || "",
-        joinedAt: new Date().toISOString(),
-      }
-    );
+//     const newUser = await database.createDocument(
+//       appwriteConfig.databaseId,
+//       appwriteConfig.userCollectionId,
+//       ID.unique(),
+//       {
+//         accountId: user.$id,
+//         email: user.email,
+//         name: user.name,
+//         imageUrl: imageUrl || "",
+//         joinedAt: new Date().toISOString(),
+//       }
+//     );
 
-    return newUser;
-  } catch (error) {
-    console.error("Store user data:", error);
-  }
-};
-export const getExistingUser = async () => {
+//     return newUser;
+//   } catch (error) {
+//     console.error("Store user data:", error);
+//   }
+// };
+export const getExistingUser = async (id: string) => {
   try {
     const user = await account.get();
 
@@ -116,5 +121,51 @@ export const getExistingUser = async () => {
     return documents[0];
   } catch (error) {
     console.error("Error logging in with Google:", error);
+  }
+};
+
+export const storeUserData = async () => {
+  try {
+    const user = await account.get();
+    if (!user) throw new Error("User not found");
+
+    const { providerAccessToken } = (await account.getSession("current")) || {};
+    const profilePicture = providerAccessToken
+      ? await getGooglePicture(providerAccessToken)
+      : null;
+
+    const createdUser = await database.createDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.userCollectionId,
+      ID.unique(),
+      {
+        accountId: user.$id,
+        email: user.email,
+        name: user.name,
+        imageUrl: profilePicture,
+        joinedAt: new Date().toISOString(),
+      }
+    );
+
+    if (!createdUser.$id) redirect("/sign-in");
+  } catch (error) {
+    console.error("Error storing user data:", error);
+  }
+};
+
+export const getAllUsers = async (limit: number, offset: number) => {
+  try {
+    const { documents: users, total } = await database.listDocuments(
+      appwriteConfig.databaseId,
+      appwriteConfig.userCollectionId,
+      [Query.limit(limit), Query.offset(offset)]
+    );
+
+    if (total === 0) return { users: [], total };
+
+    return { users, total };
+  } catch (error) {
+    console.log("Error fetching user:", error);
+    return { users: [], total: 0 };
   }
 };

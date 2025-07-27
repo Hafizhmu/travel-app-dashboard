@@ -1,12 +1,15 @@
-import { Link, NavLink } from "react-router";
+import { Link, NavLink, useLoaderData, useNavigate } from "react-router";
+import { logoutUser } from "~/appwrite/auth";
 import { sidebarItems } from "~/constants";
 import { cn } from "~/lib/utils";
 
-const NavItem = ({handleClick}: {handleClick?: () => void}) => {
-  const user = {
-    name: "John Doe",
-    email: "john.doe@fizhtour.com",
-    imageUrl: "/assets/images/david.webp",
+const NavItem = ({ handleClick }: { handleClick?: () => void }) => {
+  const user = useLoaderData();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logoutUser();
+    navigate("/sign-in");
   };
   return (
     <section className="nav-items">
@@ -23,7 +26,8 @@ const NavItem = ({handleClick}: {handleClick?: () => void}) => {
                   className={cn("group nav-item", {
                     "bg-primary-100 !text-white": isActive,
                   })}
-                onClick={handleClick}>
+                  onClick={handleClick}
+                >
                   <img
                     src={icon}
                     alt={label}
@@ -41,15 +45,14 @@ const NavItem = ({handleClick}: {handleClick?: () => void}) => {
           <img
             src={user?.imageUrl || "/assets/images/david.webp"}
             alt={user?.name || "John Doe"}
+            referrerPolicy="no-referrer"
           />
           <article>
             <h2>{user?.name || "John Doe"}</h2>
             <p>{user?.email || "john.doe@fizhtour.com"}</p>
           </article>
           <button
-            onClick={() => {
-              console.log("logout");
-            }}
+            onClick={handleLogout}
             className="cursor-pointer"
           >
             <img
